@@ -53,6 +53,24 @@ func (b *BaseBlock) SetSource(v []text.Segment) {
 	b.flags &^= flagSingle
 }
 
+// ShiftSource moves the source positions of all segments held by this block
+// by the given offset. Padding and ForceNewline are preserved, and the
+// single-segment fast path is kept intact.
+func (b *BaseBlock) ShiftSource(offset int) {
+	if offset == 0 {
+		return
+	}
+	if b.flags&flagSingle != 0 {
+		b.single[0].Start += offset
+		b.single[0].Stop += offset
+		return
+	}
+	for i := range b.source {
+		b.source[i].Start += offset
+		b.source[i].Stop += offset
+	}
+}
+
 // AppendSource implements BlockNode.AppendSource.
 func (b *BaseBlock) AppendSource(seg text.Segment) {
 	if b.source == nil {

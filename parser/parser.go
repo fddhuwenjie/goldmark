@@ -270,6 +270,12 @@ type parseContext struct {
 	openedBlocks   []Block
 
 	inlineParsers *[256][]InlineParser
+
+	// ownedLinkDefs detaches registered link definitions from their source
+	// nodes, forcing reference links to carry owned (source-independent)
+	// destination/title values. It is used by incremental editing sessions
+	// where definition nodes and their links can move independently.
+	ownedLinkDefs bool
 }
 
 // NewContext returns a new Context.
@@ -394,6 +400,10 @@ func (p *parseContext) ClearDelimiters(bottom ast.Node) {
 }
 
 func (p *parseContext) AddLinkDefinition(ref LinkDefinition) {
+	if p.ownedLinkDefs {
+		// Detach the definition from any source-indexed node value.
+		ref = NewLinkDefinition(ref.Label(), ref.Destination(), ref.Title())
+	}
 	key := util.ToLinkReference(ref.Label())
 	if _, ok := p.linkDefs[key]; !ok {
 		if p.linkDefs == nil {

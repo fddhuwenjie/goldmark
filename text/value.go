@@ -184,6 +184,19 @@ func (v SingleLineValue) WithStop(stop int) SingleLineValue {
 	return SingleLineValue{decoder: v.decoder, index: Index{Start: v.index.Start, Stop: stop}}
 }
 
+// Shift returns a SingleLineValue whose source position is moved by the given
+// offset. The decoder bound to the value is preserved.
+// Owned values are returned unchanged.
+func (v SingleLineValue) Shift(offset int) SingleLineValue {
+	if v.IsOwned() {
+		return v
+	}
+	return SingleLineValue{
+		decoder: v.decoder,
+		index:   Index{Start: v.index.Start + offset, Stop: v.index.Stop + offset},
+	}
+}
+
 var _ Value = (*MultiLineValue)(nil)
 
 // A MultiLineValue holds a potentially multiline inline value that is
@@ -391,6 +404,29 @@ func (v MultiLineValue) Indices() []Index {
 	return v.indices
 }
 
+// Shift returns a MultiLineValue whose source positions are moved by the given
+// offset. The decoder bound to the value is preserved.
+// Owned values are returned unchanged.
+func (v MultiLineValue) Shift(offset int) MultiLineValue {
+	if v.IsOwned() {
+		return v
+	}
+	out := v
+	if v.index[0].Start != 0 || v.index[0].Stop != 0 {
+		out.index[0] = Index{
+			Start: v.index[0].Start + offset,
+			Stop:  v.index[0].Stop + offset,
+		}
+	}
+	if len(v.indices) > 0 {
+		out.indices = make([]Index, len(v.indices))
+		for i, idx := range v.indices {
+			out.indices[i] = Index{Start: idx.Start + offset, Stop: idx.Stop + offset}
+		}
+	}
+	return out
+}
+
 // ValueBuilder is a helper for building a [Value].
 type ValueBuilder struct {
 	decoder Decoder
@@ -556,6 +592,22 @@ func (l *Lines) AppendSegment(seg Segment) {
 // Truncate discards all segments after the first n segments.
 func (l *Lines) Truncate(n int) {
 	l.segs = l.segs[:n]
+}
+
+// Shift moves the source position of every backing segment by the given
+// offset. Padding and ForceNewline are preserved.
+// Owned lines are left unchanged.
+func (l *Lines) Shift(offset int) {
+	if l.IsOwned() || len(l.segs) == 0 {
+		return
+	}
+	segs := make([]Segment, len(l.segs))
+	for i, seg := range l.segs {
+		seg.Start += offset
+		seg.Stop += offset
+		segs[i] = seg
+	}
+	l.segs = segs
 }
 
 // Bytes returns the concatenated byte content of all segments, or the
